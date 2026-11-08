@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import io.kestra.core.ai.agent.models.AgentToolFamily;
 import io.kestra.core.ai.agent.models.AgentWritePolicy;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.Label;
 import io.kestra.core.models.QueryFilter;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.flows.State;
@@ -53,8 +54,11 @@ class ListExecutionsToolTest {
         ListExecutionsTool.Result result = tool.listExecutions(List.of(), CONTEXT);
 
         // Then
-        assertThat(result.executions())
-            .anyMatch(summary -> executionId.equals(summary.id()) && "SUCCESS".equals(summary.state()));
+        assertThat(result.executions()).filteredOn(summary -> executionId.equals(summary.id())).singleElement().satisfies(summary -> {
+            assertThat(summary.state()).isEqualTo("SUCCESS");
+            assertThat(summary.endDate()).isEqualTo("2026-01-01T00:00:10Z");
+            assertThat(summary.labels()).containsEntry("team", "data");
+        });
     }
 
     @Test
@@ -119,6 +123,7 @@ class ListExecutionsToolTest {
                 .tenantId(tenant)
                 .namespace(NAMESPACE)
                 .flowId("flow-1")
+                .labels(List.of(new Label("team", "data")))
                 .state(state)
                 .build()
         );
