@@ -1541,7 +1541,11 @@ public class ExecutionService {
             && ListUtils.emptyOnNull(execution.getTaskRunList()).stream().allMatch(taskRun -> taskRun.getState().isTerminated());
     }
 
-    private void requestKill(Execution execution) {
+    /**
+     * Asks the executor to kill the execution, without waiting for it. A failure to emit the request is logged
+     * and not rethrown.
+     */
+    public void requestKill(Execution execution) {
         try {
             killQueue.emit(
                 ExecutionKilledExecution.builder()
@@ -1551,7 +1555,7 @@ public class ExecutionService {
                     .build()
             );
         } catch (Exception e) {
-            log.warn("Unable to request kill of orphan execution '{}'", execution.getId(), e);
+            log.warn("Unable to request kill of execution '{}'", execution.getId(), e);
         }
     }
 
@@ -1812,16 +1816,20 @@ public class ExecutionService {
     }
 
     /**
+     * Checks whether an execution is suspended in the BREAKPOINT state with at least one breakpoint recorded.
+     */
+    public static boolean isResumableFromBreakpoint(Execution execution) {
+        return execution.getState().isBreakpoint() && !ListUtils.isEmpty(execution.getBreakpoints());
+    }
+
+    /**
      * Resume an execution suspended at a breakpoint.
      *
      * @throws IllegalArgumentException if the execution is not suspended in a breakpoint
      */
     public Execution resumeFromBreakpoint(Execution execution, Optional<String> breakpoints) throws QueueException {
-        if (!execution.getState().isBreakpoint()) {
-            throw new IllegalArgumentException("Execution is not suspended");
-        }
-        if (ListUtils.isEmpty(execution.getBreakpoints())) {
-            throw new IllegalArgumentException("Execution has no breakpoint");
+        if (!isResumableFromBreakpoint(execution)) {
+            throw new IllegalArgumentException("Execution is not suspended at a breakpoint");
         }
 
         // continue the execution: SUSPENDED taskrun will go back to CREATED, so the executor will send them to the WORKER
